@@ -73,8 +73,8 @@ public partial struct TreeInsersionSystem : ISystem//, ISystemStartStop
         #region insert at start AABB body
         foreach (var (shapes, insertionData, ltw, entity) in SystemAPI.Query<RefRW<ShapeData>, RefRO<TreeInsersionData>, RefRO<LocalToWorld>>().WithEntityAccess())
         {
-            shapes.ValueRW.Position  = ltw.ValueRO.Position.xy;
-            shapes.ValueRW.PreviousPosition = ltw.ValueRO.Position.xy;
+            //shapes.ValueRW.Position  = ltw.ValueRO.Position.xy;
+            //shapes.ValueRW.PreviousPosition = ltw.ValueRO.Position.xy;
             /// rotation also ?
 
             switch (shapes.ValueRO.shapeType)

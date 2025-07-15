@@ -5,7 +5,7 @@ using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
 
-
+[UpdateInGroup(typeof(LateSimulationSystemGroup))]
 public partial struct PhysicsRenderingSystem : ISystem
 {
 
@@ -20,6 +20,16 @@ public partial struct PhysicsRenderingSystem : ISystem
 
     public void OnUpdate(ref SystemState state)
     {
+        Camera cam = CameraSingleton.Instance.MainCamera;
+
+        foreach (var trans in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<TargetData>().WithAll<PhyBodyData>())
+        {
+            //Vector3 newCamXYpos = math.lerp(cam.transform.position, trans.ValueRO.Position, 8f * (1f / 60f));
+            /// smoothing to the player cause visible stutter at high speed
+            Vector3 newCamXYpos = trans.ValueRO.Position;
+            cam.transform.position = new Vector3(newCamXYpos.x, newCamXYpos.y, cam.transform.position.z);
+
+        }
 
         foreach (var (shape, trans) in SystemAPI.Query<RefRW<ShapeData>, RefRW<LocalTransform>>().WithAny<PhyBodyData>())
         {
@@ -31,7 +41,6 @@ public partial struct PhysicsRenderingSystem : ISystem
             ////trans.ValueRW.Rotation = Quaternion.Euler(0,0, math.lerp(shape.ValueRO.PreviousRotation, shape.ValueRO.Rotation, alpha));
             trans.ValueRW.Position = new float3(shape.ValueRO.Position, trans.ValueRO.Position.z);
             trans.ValueRW.Rotation = Quaternion.Euler(0,0, shape.ValueRO.Rotation);
-
         }
 
     }

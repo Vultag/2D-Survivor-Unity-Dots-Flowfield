@@ -4,7 +4,7 @@ using UnityEngine;
 /// tag for now
 public struct AgentData : IComponentData
 {
-    
+    public float lifetime;
 }
 public class AgentAuthoring : MonoBehaviour
 {
@@ -16,7 +16,10 @@ public class AgentAuthoring : MonoBehaviour
 
             Entity entity = GetEntity(TransformUsageFlags.None);
 
-            AddComponent(entity, new AgentData());
+            AddComponent(entity, new AgentData
+            {
+                lifetime = 25f
+            });
         }
     }
 }

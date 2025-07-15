@@ -35,6 +35,15 @@ public partial class @PlayerInputs: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""Zoom"",
+                    ""type"": ""Value"",
+                    ""id"": ""f98139d7-91ae-41d1-9d21-6c8ece6b79ad"",
+                    ""expectedControlType"": ""Axis"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
                 }
             ],
             ""bindings"": [
@@ -92,6 +101,39 @@ public partial class @PlayerInputs: IInputActionCollection2, IDisposable
                     ""action"": ""Mouvements"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""1D Axis"",
+                    ""id"": ""705505e4-844b-4715-a390-88fb7b22e5be"",
+                    ""path"": ""1DAxis"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Zoom"",
+                    ""isComposite"": true,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": ""Positive"",
+                    ""id"": ""314b6092-32b1-4613-ab3d-d7b82bbedf62"",
+                    ""path"": ""<Mouse>/scroll/up"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Zoom"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""Negative"",
+                    ""id"": ""cb457e09-450f-4ebf-892c-54d4d31acdac"",
+                    ""path"": ""<Mouse>/scroll/down"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Zoom"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
                 }
             ]
         }
@@ -101,6 +143,7 @@ public partial class @PlayerInputs: IInputActionCollection2, IDisposable
         // PlayerMap
         m_PlayerMap = asset.FindActionMap("PlayerMap", throwIfNotFound: true);
         m_PlayerMap_Mouvements = m_PlayerMap.FindAction("Mouvements", throwIfNotFound: true);
+        m_PlayerMap_Zoom = m_PlayerMap.FindAction("Zoom", throwIfNotFound: true);
     }
 
     ~@PlayerInputs()
@@ -168,11 +211,13 @@ public partial class @PlayerInputs: IInputActionCollection2, IDisposable
     private readonly InputActionMap m_PlayerMap;
     private List<IPlayerMapActions> m_PlayerMapActionsCallbackInterfaces = new List<IPlayerMapActions>();
     private readonly InputAction m_PlayerMap_Mouvements;
+    private readonly InputAction m_PlayerMap_Zoom;
     public struct PlayerMapActions
     {
         private @PlayerInputs m_Wrapper;
         public PlayerMapActions(@PlayerInputs wrapper) { m_Wrapper = wrapper; }
         public InputAction @Mouvements => m_Wrapper.m_PlayerMap_Mouvements;
+        public InputAction @Zoom => m_Wrapper.m_PlayerMap_Zoom;
         public InputActionMap Get() { return m_Wrapper.m_PlayerMap; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -185,6 +230,9 @@ public partial class @PlayerInputs: IInputActionCollection2, IDisposable
             @Mouvements.started += instance.OnMouvements;
             @Mouvements.performed += instance.OnMouvements;
             @Mouvements.canceled += instance.OnMouvements;
+            @Zoom.started += instance.OnZoom;
+            @Zoom.performed += instance.OnZoom;
+            @Zoom.canceled += instance.OnZoom;
         }
 
         private void UnregisterCallbacks(IPlayerMapActions instance)
@@ -192,6 +240,9 @@ public partial class @PlayerInputs: IInputActionCollection2, IDisposable
             @Mouvements.started -= instance.OnMouvements;
             @Mouvements.performed -= instance.OnMouvements;
             @Mouvements.canceled -= instance.OnMouvements;
+            @Zoom.started -= instance.OnZoom;
+            @Zoom.performed -= instance.OnZoom;
+            @Zoom.canceled -= instance.OnZoom;
         }
 
         public void RemoveCallbacks(IPlayerMapActions instance)
@@ -212,5 +263,6 @@ public partial class @PlayerInputs: IInputActionCollection2, IDisposable
     public interface IPlayerMapActions
     {
         void OnMouvements(InputAction.CallbackContext context);
+        void OnZoom(InputAction.CallbackContext context);
     }
 }
