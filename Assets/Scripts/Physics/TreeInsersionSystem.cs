@@ -1,13 +1,7 @@
-using System.Drawing;
-using System.Linq;
-using Unity.Collections;
+
 using Unity.Entities;
-using Unity.Entities.UniversalDelegates;
 using Unity.Transforms;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.UIElements;
-using static UnityEngine.EventSystems.EventTrigger;
 using Color = UnityEngine.Color;
 
 [UpdateInGroup(typeof(SimulationSystemGroup),OrderFirst = true)]
@@ -18,6 +12,7 @@ public partial struct TreeInsersionSystem : ISystem//, ISystemStartStop
     public static EntityQuery CirclesShapesQuery;
     public static DynamicAABBTree DynamicBodiesAABBtree;
     public static DynamicAABBTree StaticBodiesAABBtree;
+
     /*Arbitratry fat on AABB to reduce de Insert/remove each frame*/
     public static float AABBfat;
 

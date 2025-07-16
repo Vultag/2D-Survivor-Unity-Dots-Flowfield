@@ -16,7 +16,7 @@ partial struct AgentSystem : ISystem
         targetEntityQuery = state.EntityManager.CreateEntityQuery(typeof(TargetData));
     }
 
-    //[BurstCompile]
+    [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
         var PlayerPosition = state.EntityManager.GetComponentData<LocalTransform>(targetEntityQuery.GetSingletonEntity()).Position;

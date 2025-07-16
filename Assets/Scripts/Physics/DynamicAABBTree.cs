@@ -312,7 +312,7 @@ public struct DynamicAABBTree
             { newNode.box = Union(nodes[newNode.LeftChild].box, nodes[newNode.RightChild].box); }
             
             ///breaks early if the box growth has no incidence on ancestor
-            if(newNode.box.Equals(nodes[parentNodeID].box))
+            if ((newNode.box.LowerBound == nodes[parentNodeID].box.LowerBound) && (newNode.box.UpperBound == nodes[parentNodeID].box.UpperBound))
             { break; }
             else
             {

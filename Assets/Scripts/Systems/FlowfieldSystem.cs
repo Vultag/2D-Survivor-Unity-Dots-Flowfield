@@ -1,15 +1,10 @@
 
-using TMPro;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
-using Unity.Entities.UniversalDelegates;
 using Unity.Mathematics;
 using Unity.Transforms;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.Rendering;
-using UnityEngine.UIElements;
 
 public static class FlowfieldGridStorage
 {
@@ -20,7 +15,7 @@ public static class FlowfieldGridStorage
     public static FlowfieldCellData GetCellFromPosition(float3 position)
     {
         float2 positionOnGrid = (new float2(position.x, position.y) - gridCenter) + (float2)gridSize * 0.5f;
-        int2 cellCoords = new int2(Mathf.Clamp(Mathf.FloorToInt(positionOnGrid.x), 0, gridSize.x), Mathf.Clamp(Mathf.FloorToInt(positionOnGrid.y), 0, gridSize.y-1));
+        int2 cellCoords = new int2(Mathf.Clamp(Mathf.FloorToInt(positionOnGrid.x), 0, gridSize.x-1), Mathf.Clamp(Mathf.FloorToInt(positionOnGrid.y), 0, gridSize.y-1));
         return flowfieldGrid[cellCoords.x+ cellCoords.y*gridSize.x];
     }
 }
@@ -42,9 +37,6 @@ public partial struct FlowfieldSystem : ISystem
     private int2 gridSize;
     private ushort cellNum;
     private ushort innerCellNum;
-    private int2 updateRect;
-
-    private int2 previousFrameRectStart;
 
     /// <summary>
     /// To pass to the shader
@@ -78,8 +70,6 @@ public partial struct FlowfieldSystem : ISystem
 
     public void OnUpdate(ref SystemState state)
     {
-        updateRect = new int2(2, 2);
-
         float3 targetPosition = state.EntityManager.GetComponentData<LocalToWorld>(TargetQuery.GetSingletonEntity()).Value.Translation();
         float2 targetPositionOnGrid = (new float2(targetPosition.x, targetPosition.y) - gridCenter) + (float2)gridSize * 0.5f;
         int2 updatedTargetCell = new int2(Mathf.FloorToInt(targetPositionOnGrid.x), Mathf.FloorToInt(targetPositionOnGrid.y));
@@ -95,7 +85,6 @@ public partial struct FlowfieldSystem : ISystem
             updatedTargetCell = new int2(Mathf.Clamp(updatedTargetCell.x, 1, gridSize.x-2), Mathf.Clamp(updatedTargetCell.y, 1, gridSize.y-2));
             targetCell = updatedTargetCell;
 
-            /// remove ?
             UpdateGrid(ref state);
 
             RequiresRebuild = false;
@@ -142,9 +131,6 @@ public partial struct FlowfieldSystem : ISystem
         gridSize = new int2(cellXresolution, cellYresolution);
         FlowfieldGridStorage.gridSize = gridSize;
         Shader.SetGlobalVector("_FlowfieldPosSize", new Vector4(gridCenter.x, gridCenter.y, gridSize.x, gridSize.y));
-
-        //TreeInsersionSystem.DrawQuad(lowerGrid, upperGrid, Color.green);
-        //TreeInsersionSystem.DrawQuad(gridCenter- dimentions * 0.5f, gridCenter + dimentions * 0.5f, Color.red);
 
         FlowfieldGridStorage.flowfieldGrid = new NativeArray<FlowfieldCellData>(gridSize.x* gridSize.y, Allocator.Persistent);
         flowfieldGrid = FlowfieldGridStorage.flowfieldGrid;
@@ -263,7 +249,7 @@ public partial struct FlowfieldSystem : ISystem
 
     private void UpdateGrid(ref SystemState state)
     {
-
+        /// Clear every inner cells for updating
         innerCellNum = (ushort)((gridSize.x - 2) * (gridSize.y - 2));
         for (int i = 0; i < innerCellNum; i++)
         {
@@ -284,10 +270,6 @@ public partial struct FlowfieldSystem : ISystem
             visitedCells[flattenedIdx] = false;
         }
 
-        //var LimitedFieldUpdateNum = Mathf.Min(800, flowfieldGrid.Length);
-        var LimitedFieldUpdateNum = flowfieldGrid.Length;
-        var cellUpdatedCount = 1;
-
         visibleCellsToVisit = new NativeQueue<int2>(Allocator.Temp);
         /// seperate cell check queue to visit after the visible one each iteration for the LOS to be properly assigned
         obstructedCellsToVisit = new NativeQueue<(int2, float2)>(Allocator.Temp);
@@ -299,9 +281,8 @@ public partial struct FlowfieldSystem : ISystem
         currentEvaluatedCost = 0;
         visibleBatchSize = 1;
         obstructedBatchSize = 0;
-        cellUpdatedCount = 1;
 
-        while ((cellUpdatedCount < LimitedFieldUpdateNum) & (!visibleCellsToVisit.IsEmpty() | !obstructedCellsToVisit.IsEmpty()))
+        while ((!visibleCellsToVisit.IsEmpty() | !obstructedCellsToVisit.IsEmpty()))
         {
             for (int i = 0; i < visibleBatchSize; i++)
             {
@@ -527,8 +508,7 @@ public partial struct FlowfieldSystem : ISystem
                 proximityDirectionInfluance = proximityDirectionInfluance.normalized;
 
                 Vector2 cellDirection = (evaluatedCell.IsNextToObstacle ? proximityDirectionInfluance * 0.2f + (Vector2)forcedDirection * 0.8f : proximityDirectionInfluance * 0.8f + (Vector2)forcedDirection * 0.2f);
-                //cellDirection = cellDirection.normalized;
-
+        
                 /// Propagate to the neighbors
                 /// LEFT
                 {
@@ -608,7 +588,6 @@ public partial struct FlowfieldSystem : ISystem
 
             visibleBatchSize = (ushort)visibleCellsToVisit.Count;
             obstructedBatchSize = (ushort)obstructedCellsToVisit.Count;
-            cellUpdatedCount += visibleBatchSize + obstructedBatchSize;
             currentEvaluatedCost++;
         }
 
@@ -700,30 +679,18 @@ public partial struct FlowfieldSystem : ISystem
     {
 
         Vector2 cornerFromTraget = (cornerStart - targetCellCenter);
-        //float2 direction = new Vector2(cornerFromTraget.x, cornerFromTraget.y) .normalized;
         float2 relDirection = new Vector2(Mathf.Abs(cornerFromTraget.x), Mathf.Abs(cornerFromTraget.y)) .normalized;
         Vector2 directionSign = new Vector2(Mathf.Sign(cornerFromTraget.x), Mathf.Sign(cornerFromTraget.y));
         float slope = relDirection.x;
 
-        //float2 delta = relDirection.x > relDirection.y ? new float2(1, relDirection.x != 0 ? relDirection.y / relDirection.x : 0) : new float2(relDirection.y != 0 ? relDirection.x / relDirection.y : 0, 1);
         Vector2 delta = cornerFromTraget.normalized;
-        ////Vector2 delta = math.select(
-        ////    new float2(math.select(0, relDirection.x / relDirection.y, relDirection.y != 0), 1), 
-        ////    new float2(1, math.select(0, relDirection.y / relDirection.x, relDirection.x != 0)), relDirection.x > relDirection.y);
-        
-        ////delta *= directionSign;
-
+      
         Vector2 evaluatedPoint = cornerStart + delta * 0.5f;
 
         /// compare the TargetToCorner ray to the TargetToGridCorner ray inclinason to know if
         /// the corner ray bumps vertically or horizontally and define cell iteration num that way
-
         Vector2 relevantGridCorner = new Vector2(math.select(1, (gridSize.x-1), cornerFromTraget.x > 0), math.select(1, (gridSize.y-1), cornerFromTraget.y > 0));
-        ///// use the updateRect corner instead
-        //Vector2 relevantGridCorner = new Vector2(
-        //    math.select((targetCellCenter.x - 0.5f) - updateRect.x, (targetCellCenter.x - 0.5f) + updateRect.x, cornerFromTraget.x > 0),
-        //    math.select((targetCellCenter.y - 0.5f) - updateRect.y, (targetCellCenter.y - 0.5f) + updateRect.y, cornerFromTraget.y > 0));
-
+     
         float slopeToGridCorner = Mathf.Abs(new Vector2(targetCellCenter.x - relevantGridCorner.x, targetCellCenter.y - relevantGridCorner.y).normalized.x);
 
         float relevantLimit = math.select(relevantGridCorner.y, relevantGridCorner.x, slope > slopeToGridCorner);
@@ -732,53 +699,29 @@ public partial struct FlowfieldSystem : ISystem
 
         int cellsToGridEnd = Mathf.FloorToInt(distanceToLimit / (math.select(Mathf.Abs(delta.y), Mathf.Abs(delta.x), slope > slopeToGridCorner))) +1;
 
-        //Debug.Log(cornerStart);
-        //Debug.Log(cellsToGridEnd);
-        //Debug.Log(distanceToLimit);
-        //Debug.Log(delta);
-
-
-        //var cellsToGridEnd = (slope > slopeToGridCorner ?
-        //(cornerFromTraget.x > 0 ? gridSize.x - (cornerStart.x) : cornerStart.x):
-        //(cornerFromTraget.y > 0 ? gridSize.y - (cornerStart.y) : cornerStart.y));
-
-        //Debug.Log(cellsToGridEnd);
-        //Debug.Log(slope);
-        //Debug.Log(slopeToGridCorner);
-
         int2 evaluatedCoords = new int2(Mathf.FloorToInt(evaluatedPoint.x), Mathf.FloorToInt(evaluatedPoint.y));
 
-        /// Check if evaluatedCoords is within the grid
-        /// BETTER YET -> CALCULATE AHEAD THE NUMBER OF ITERATION
+        /// Remaining iteration
         while (cellsToGridEnd>0)
-        //while (evaluatedCoords.x < gridSize.x && evaluatedCoords.y< gridSize.y && evaluatedCoords.x >= 0 && evaluatedCoords.y >= 0)
+        ///while (evaluatedCoords.x < gridSize.x && evaluatedCoords.y< gridSize.y && evaluatedCoords.x >= 0 && evaluatedCoords.y >= 0) SAFETY
         {
-            /// testing 
-            /// 
-            //Debug.LogError(testevaluatedPoint);
-            var testcornerStart = cornerStart - (Vector2)((float2)gridSize * 0.5f - gridCenter);
-            var testevaluatedPoint = evaluatedPoint - (Vector2)((float2)gridSize * 0.5f - gridCenter);
-            var testerelevantGridCorner = (float2)relevantGridCorner - ((float2)gridSize * 0.5f - gridCenter);
-            
-            Debug.DrawLine(new Vector3(testcornerStart.x, testcornerStart.y, 0), new Vector3(testevaluatedPoint.x, testevaluatedPoint.y, 0), slope > slopeToGridCorner ? Color.green : Color.red,1);
+            /// testing
+            //var testcornerStart = cornerStart - (Vector2)((float2)gridSize * 0.5f - gridCenter);
+            //var testevaluatedPoint = evaluatedPoint - (Vector2)((float2)gridSize * 0.5f - gridCenter);
+            //var testerelevantGridCorner = (float2)relevantGridCorner - ((float2)gridSize * 0.5f - gridCenter);
+            //Debug.DrawLine(new Vector3(testcornerStart.x, testcornerStart.y, 0), new Vector3(testevaluatedPoint.x, testevaluatedPoint.y, 0), slope > slopeToGridCorner ? Color.green : Color.red,1);
 
-            //Debug.Break();
-            //Debug.LogWarning(evaluatedCoords);
             int flattenedIdx = evaluatedCoords.x + evaluatedCoords.y * gridSize.x;
             var newFlowfieldCell = flowfieldGrid[flattenedIdx];
             var newFlowfieldCellGPU = flowfieldGridGPU[flattenedIdx];
-            //newFlowfieldCell.Cost = 500;
-            //newFlowfieldCellGPU.Cost = 500;
+
             newFlowfieldCell.InLineOfSight = false;
             newFlowfieldCellGPU.InLineOfSight = 0;
             flowfieldGrid[flattenedIdx] = newFlowfieldCell;
             flowfieldGridGPU[flattenedIdx] = newFlowfieldCellGPU;
 
-
-
             evaluatedPoint += delta;
             evaluatedCoords = new int2(Mathf.FloorToInt(evaluatedPoint.x), Mathf.FloorToInt(evaluatedPoint.y));
-            //Debug.Log(evaluatedCoords);
             cellsToGridEnd--;
         }
 
